@@ -23,7 +23,7 @@ app.use(
   cors({
     origin: [
       "http://localhost:5174", // Vite dev
-      "http://localhost:3000",
+      "https://we-designbrand.site",
       // add your deployed frontend later, example:
       // "https://we-designbrand.site"
     ],
