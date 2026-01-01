@@ -44,8 +44,9 @@ router.post("/create-order", async (req, res) => {
 /**
  * VERIFY PAYMENT + SAVE ORDER
  */
-console.log("VERIFY BODY 👉", req.body);
 router.post("/verify-payment", (req, res) => {
+  console.log("VERIFY BODY 👉", req.body);
+
   try {
     const {
       razorpay_order_id,
