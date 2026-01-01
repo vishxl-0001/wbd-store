@@ -23,7 +23,7 @@ app.use(
   cors({
     origin: [
       "http://localhost:5174", // Vite dev
-      "https://we-designbrand.site/"
+      "https://we-designbrand.site"
       // add production frontend later
     ],
     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
