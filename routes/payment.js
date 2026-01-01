@@ -8,7 +8,7 @@ const router = express.Router();
 
 const razorpay = new Razorpay({
   key_id: process.env.RAZORPAY_KEY_ID,
-  key_secret: process.env.RAZORPAY_KEY_SECRET
+  key_secret: process.env.RAZORPAY_KEY_SECRET,
 });
 
 /**
@@ -18,34 +18,17 @@ router.post("/create-order", async (req, res) => {
   try {
     let { amount } = req.body;
 
-    console.log("➡️ Incoming amount:", amount);
-
-    // 🔒 HARD VALIDATION
     amount = Number(amount);
 
     if (!Number.isInteger(amount) || amount <= 0) {
-      console.error("❌ Invalid amount:", amount);
-      return res.status(400).json({
-        success: false,
-        error: "Invalid amount",
-      });
-    }
-
-    if (!process.env.RAZORPAY_KEY_ID || !process.env.RAZORPAY_KEY_SECRET) {
-      console.error("❌ Razorpay ENV missing");
-      return res.status(500).json({
-        success: false,
-        error: "Razorpay keys not configured",
-      });
+      return res.status(400).json({ success: false, error: "Invalid amount" });
     }
 
     const order = await razorpay.orders.create({
-      amount: amount * 100, // paise (safe now)
+      amount: amount * 100,
       currency: "INR",
       receipt: "rcpt_" + Date.now(),
     });
-
-    console.log("✅ Razorpay order created:", order.id);
 
     res.json({
       success: true,
@@ -54,45 +37,46 @@ router.post("/create-order", async (req, res) => {
     });
   } catch (err) {
     console.error("❌ CREATE ORDER ERROR:", err);
-    res.status(500).json({
-      success: false,
-      error: err.message,
-    });
+    res.status(500).json({ success: false, error: "Order creation failed" });
   }
 });
 
 /**
- * VERIFY PAYMENT
+ * VERIFY PAYMENT + SAVE ORDER
  */
 router.post("/verify-payment", (req, res) => {
-  const {
-    razorpay_order_id,
-    razorpay_payment_id,
-    razorpay_signature,
-    customer,
-    items,
-    amount
-  } = req.body;
+  try {
+    const {
+      razorpay_order_id,
+      razorpay_payment_id,
+      razorpay_signature,
+      customer,
+      items,
+      amount,
+    } = req.body;
 
-  const body = razorpay_order_id + "|" + razorpay_payment_id;
+    const body = `${razorpay_order_id}|${razorpay_payment_id}`;
 
-  const expectedSignature = crypto
-    .createHmac("sha256", process.env.RAZORPAY_KEY_SECRET)
-    .update(body.toString())
-    .digest("hex");
+    const expectedSignature = crypto
+      .createHmac("sha256", process.env.RAZORPAY_KEY_SECRET)
+      .update(body)
+      .digest("hex");
 
-  if (expectedSignature !== razorpay_signature) {
-    return res.status(400).json({ success: false });
-  }
+    if (expectedSignature !== razorpay_signature) {
+      console.error("❌ Signature mismatch");
+      return res.status(400).json({ success: false, error: "Invalid signature" });
+    }
 
-  const orderUUID = uuidv4();
+    const orderUUID = uuidv4();
 
-  db.query(
-    `INSERT INTO orders 
-    (order_uuid, full_name, phone, address, items, amount,
-     razorpay_order_id, razorpay_payment_id, status)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    [
+    const sql = `
+      INSERT INTO orders
+      (order_uuid, full_name, phone, address, items, amount,
+       razorpay_order_id, razorpay_payment_id, status)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `;
+
+    const values = [
       orderUUID,
       customer.name,
       customer.phone,
@@ -101,22 +85,35 @@ router.post("/verify-payment", (req, res) => {
       amount,
       razorpay_order_id,
       razorpay_payment_id,
-      "PAID"
-    ],
-    () => {
+      "PAID",
+    ];
+
+    db.query(sql, values, (err, result) => {
+      if (err) {
+        console.error("❌ DB INSERT ERROR:", err);
+        return res.status(500).json({
+          success: false,
+          error: "Order save failed",
+        });
+      }
+
+      console.log("✅ Order saved:", orderUUID);
       res.json({ success: true, orderId: orderUUID });
-    }
-  );
+    });
+  } catch (err) {
+    console.error("❌ VERIFY ERROR:", err);
+    res.status(500).json({ success: false });
+  }
 });
 
 /**
- * FETCH ORDER (by phone or orderId)
+ * FETCH ORDER
  */
 router.post("/get-order", (req, res) => {
   const { phone, orderId } = req.body;
 
-  let query = "";
-  let values = [];
+  let query;
+  let values;
 
   if (orderId) {
     query = "SELECT * FROM orders WHERE order_uuid = ?";
@@ -130,6 +127,7 @@ router.post("/get-order", (req, res) => {
 
   db.query(query, values, (err, results) => {
     if (err) {
+      console.error("❌ FETCH ORDER ERROR:", err);
       return res.status(500).json({ error: "DB error" });
     }
 
@@ -140,6 +138,5 @@ router.post("/get-order", (req, res) => {
     res.json({ success: true, orders: results });
   });
 });
-
 
 module.exports = router;
