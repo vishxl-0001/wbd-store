@@ -1,4 +1,4 @@
-// 🔴 Catch hidden crashes (VERY IMPORTANT)
+// 🔴 Catch hidden crashes
 process.on("uncaughtException", (err) => {
   console.error("UNCAUGHT EXCEPTION:", err);
 });
@@ -17,24 +17,19 @@ const paymentRoutes = require("./routes/payment");
 const app = express();
 
 /**
- * ✅ CORS CONFIG (FIXES YOUR ERROR)
+ * ✅ CORS (CORRECT FIX — NO app.options("*"))
  */
 app.use(
   cors({
     origin: [
       "http://localhost:5174", // Vite dev
-      "https://we-designbrand.site",
-      // add your deployed frontend later, example:
-      // "https://we-designbrand.site"
+      "hhttps://we-designbrand.site/",
+      // add production frontend later
     ],
     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization"],
-    credentials: true,
   })
 );
-
-// ✅ VERY IMPORTANT: handle preflight requests
-app.options("*", cors());
 
 /**
  * ✅ Middleware
@@ -58,16 +53,6 @@ app.use("/api", paymentRoutes);
  */
 const PORT = process.env.PORT || 5000;
 
-/**
- * ✅ Start server
- */
-const server = app.listen(PORT, () => {
+app.listen(PORT, () => {
   console.log(`Backend running on port ${PORT}`);
-});
-
-/**
- * 🔴 Catch server errors
- */
-server.on("error", (err) => {
-  console.error("SERVER ERROR:", err);
 });
