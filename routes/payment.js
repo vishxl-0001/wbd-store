@@ -79,16 +79,17 @@ router.post("/verify-payment", (req, res) => {
     `;
 
     const values = [
-      orderUUID,
-      customer.name,
-      customer.phone,
-      customer.address,
-      JSON.stringify(items),
-      amount,
-      razorpay_order_id,
-      razorpay_payment_id,
-      "PAID",
-    ];
+  orderUUID,
+  customer?.name || "",
+  customer?.phone || "",
+  customer?.address || "",
+  JSON.stringify(items || []),
+  Number(amount),
+  razorpay_order_id,
+  razorpay_payment_id,
+  "PAID",
+];
+
 
     db.query(sql, values, (err, result) => {
       if (err) {
